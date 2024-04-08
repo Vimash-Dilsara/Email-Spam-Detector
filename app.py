@@ -1,13 +1,15 @@
-# app.py
-
 from flask import Flask, render_template, request
 import pandas as pd
 import joblib
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
+from logger import setup_logger
 
 app = Flask(__name__)
+
+# Set up logger
+logger = setup_logger()
 
 # Load vocabulary and model
 vocab = pd.read_csv('Static/vocab.txt', header=None)[0].tolist()
@@ -18,6 +20,7 @@ Cv = CountVectorizer(vocabulary=vocab)
 
 # Function to preprocess text
 def text_preprocessor(text):
+    logger.info("Preprocessing text...")
     lemmatizer = WordNetLemmatizer()
     tokens = word_tokenize(text.lower())
     clear_text = [x for x in tokens if x.isalpha()]
@@ -25,13 +28,23 @@ def text_preprocessor(text):
     joined_sw = ' '.join(remove_sw)
     tokens = word_tokenize(joined_sw)
     lemmatized_tokens = [lemmatizer.lemmatize(word=token, pos='v') for token in tokens]
+    logger.info("Text preprocessing completed.")
     return ' '.join(lemmatized_tokens)
+
+# Function to vectorize text
+def vectorize_text(text):
+    logger.info("Vectorizing text...")
+    preprocessed_text = text_preprocessor(text)
+    vectorized_text = Cv.transform([preprocessed_text])
+    logger.info("Text vectorization completed.")
+    return vectorized_text
 
 # Function to predict spam
 def predict_spam(text):
-    preprocessed_text = text_preprocessor(text)
-    vectorized_text = Cv.transform([preprocessed_text])
+    logger.info("Predicting spam...")
+    vectorized_text = vectorize_text(text)
     prediction = loaded_model.predict(vectorized_text)[0]
+    logger.info("Spam prediction completed.")
     return prediction
 
 # Route to render HTML form
@@ -48,5 +61,8 @@ def predict():
         result = "This email is spam."
     else:
         result = "This email is not spam."
+    logger.info(f"Prediction result: {result}")
     return render_template('result.html', result=result)
 
+if __name__ == "__main__":
+    app.run(debug=True)
